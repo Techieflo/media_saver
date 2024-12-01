@@ -68,11 +68,12 @@ def get_instagram_reel_url(url, session_id):
 def get_youtube_video_url(url):
     """Fetch the direct video URL for YouTube."""
     try:
-        cookies_path = download_and_save_cookies()  # Download cookies from MediaFire
+        cookies_path = download_and_save_cookies()  # Use the downloaded cookie path
         ydl_opts = {
             'format': 'best',
             'quiet': True,
-            'cookies': cookies_path,  # Use cookies for authentication
+            'cookies': cookies_path,  # Pass the cookies file to yt-dlp
+            'noplaylist': True,  # Disable playlist extraction (if not needed)
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             result = ydl.extract_info(url, download=False)
