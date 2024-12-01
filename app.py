@@ -1,6 +1,5 @@
 from flask import Flask, jsonify, request
 import yt_dlp
-import instaloader
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -19,22 +18,19 @@ def get_video_url(url):
             return result['entries'][0]['url']  # Return the first video URL
         return result['url']  # Return the video URL
 
-# Helper function to get Instagram Reel URL using Instaloader
-def get_instagram_reel_url(url, session_id):
-    """Fetch the direct video URL for Instagram Reels using Instaloader."""
+# Helper function to get Instagram Reel URL using yt-dlp
+def get_instagram_reel_url(url):
+    """Fetch the direct video URL for Instagram Reels using yt-dlp."""
     try:
-        loader = instaloader.Instaloader()
-        loader.context._session.cookies.set('sessionid', session_id)  # Use session ID for auth
-
-        shortcode = url.split('/')[-2]  # Extract shortcode from URL
-        post = instaloader.Post.from_shortcode(loader.context, shortcode)
-
-        # Ensure that the post is a video
-        if not post.is_video:
-            raise RuntimeError("The provided URL does not point to a video reel.")
-
-        # Return the URL of the video
-        return post.url
+        ydl_opts = {
+            'format': 'best',
+            'quiet': True,  # Suppress unnecessary output
+        }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            result = ydl.extract_info(url, download=False)  # Don't download, just extract info
+            if 'entries' in result:
+                return result['entries'][0]['url']  # Return the first video URL
+            return result['url']  # Return the video URL
     except Exception as e:
         raise RuntimeError(f"Error: {e}")
 
@@ -63,13 +59,12 @@ def video_url_api():
 def instagram_reel_url_api():
     """API endpoint to get the Instagram reel URL."""
     url = request.args.get('url')
-    session_id = request.args.get('session_id')
 
-    if not url or not session_id:
-        return handle_error('URL and session_id parameters are required')
+    if not url:
+        return handle_error('URL parameter is required')
 
     try:
-        reel_url = get_instagram_reel_url(url, session_id)
+        reel_url = get_instagram_reel_url(url)
         return jsonify({'video_url': reel_url})
     except Exception as e:
         return handle_error(f'Error: {str(e)}', 500)
