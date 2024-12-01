@@ -27,7 +27,7 @@ Original file is located at
 # youtube_url = "https://www.instagram.com/reel/C03Sj8OoL_1/"
 # video_url = get_youtube_video_url(youtube_url)
 # print("Video URL:", video_url)
-!pip install flask-ngrok
+
 from flask_ngrok import run_with_ngrok
 
 
