@@ -1,0 +1,5 @@
+ydl_opts = {
+    'format': 'best',
+    'quiet': True,
+    'cookiefile': 'cookies.txt',  # Path to your cookies file
+}
