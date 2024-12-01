@@ -6,9 +6,17 @@ import os
 # Initialize Flask app
 app = Flask(__name__)
 
-# Helper function to check if the session ID is valid
-def is_session_valid(session_id):
-    """Check if the provided session ID is valid."""
+# Helper function to fetch cookies from environment variables
+def get_session_cookies():
+    """Fetch session cookies from environment variables."""
+    session_id = os.getenv('SESSION_ID')
+    if not session_id:
+        raise ValueError("Session ID is not set in environment variables.")
+    return session_id
+
+# Helper function to check if the session ID is valid (for Instagram)
+def is_instagram_session_valid(session_id):
+    """Check if the provided session ID is valid for Instagram."""
     try:
         loader = instaloader.Instaloader()
         loader.context._session.cookies.set('sessionid', session_id)
@@ -16,7 +24,7 @@ def is_session_valid(session_id):
         instaloader.Profile.from_username(loader.context, "instagram")
         return True
     except Exception as e:
-        print(f"Session validation error: {e}")
+        print(f"Instagram session validation error: {e}")
         return False
 
 # Helper function to get Instagram reel URL using Instaloader
@@ -25,35 +33,35 @@ def get_instagram_reel_url(url, session_id):
     try:
         loader = instaloader.Instaloader()
         loader.context._session.cookies.set('sessionid', session_id)
-
         shortcode = url.split('/')[-2]  # Extract shortcode from URL
         post = instaloader.Post.from_shortcode(loader.context, shortcode)
 
-        # Ensure that the post is a video
         if not post.is_video:
             raise RuntimeError("The provided URL does not point to a video reel.")
 
-        # Return the URL of the video
         return post.video_url
     except Exception as e:
-        raise RuntimeError(f"Error: {e}")
+        raise RuntimeError(f"Error fetching Instagram reel: {e}")
 
-# Helper function to get video URL from generic platforms (yt-dlp)
-def get_video_url(url):
-    """Fetch the direct video URL using yt-dlp."""
-    ydl_opts = {
-        'format': 'best',  # Choose the best video quality
-        'quiet': True,     # Suppress unnecessary output
-    }
-
+# Helper function to get YouTube video URL using yt-dlp
+def get_youtube_video_url(url):
+    """Fetch the direct video URL for YouTube using yt-dlp."""
     try:
+        cookies = get_session_cookies()  # Fetch session cookies (if any)
+
+        ydl_opts = {
+            'format': 'best',
+            'quiet': True,
+            'cookies': cookies  # Add the cookies to the yt-dlp options
+        }
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            result = ydl.extract_info(url, download=False)  # Don't download, just extract info
+            result = ydl.extract_info(url, download=False)
             if 'entries' in result:
-                return result['entries'][0]['url']  # Return the first video URL
-            return result['url']  # Return the video URL
+                return result['entries'][0]['url']
+            return result['url']
     except Exception as e:
-        raise RuntimeError(f"Error fetching video URL: {str(e)}")
+        raise RuntimeError(f"Error fetching YouTube video: {e}")
 
 # Helper function to handle errors
 def handle_error(message, status_code=400):
@@ -65,18 +73,12 @@ def handle_error(message, status_code=400):
 def instagram_reel_url_api():
     """API endpoint to get the Instagram reel URL."""
     url = request.args.get('url')
+    session_id = get_session_cookies()  # Fetch session ID from environment
 
-    if not url:
-        return handle_error('URL parameter is required')
+    if not url or not session_id:
+        return handle_error('URL and session_id parameters are required')
 
-    # Fetch the session ID from environment variables
-    session_id = os.getenv('SESSION_ID')
-
-    if not session_id:
-        return handle_error('Session ID is not set. Please configure the session ID in the environment variables.', 500)
-
-    # Validate session ID before proceeding
-    if not is_session_valid(session_id):
+    if not is_instagram_session_valid(session_id):
         return handle_error('Invalid or expired session ID. Please provide a valid session ID.', 401)
 
     try:
@@ -85,17 +87,17 @@ def instagram_reel_url_api():
     except Exception as e:
         return handle_error(f'Error: {str(e)}', 500)
 
-# API endpoint to get the generic video URL (from YouTube or other sources)
-@app.route('/get_video_url', methods=['GET'])
-def video_url_api():
-    """API endpoint to get the video URL from the provided URL (YouTube or other platforms)."""
+# API endpoint to get the YouTube video URL
+@app.route('/get_youtube_video_url', methods=['GET'])
+def youtube_video_url_api():
+    """API endpoint to get the YouTube video URL."""
     url = request.args.get('url')
 
     if not url:
         return handle_error('URL parameter is required')
 
     try:
-        video_url = get_video_url(url)
+        video_url = get_youtube_video_url(url)
         return jsonify({'video_url': video_url})
     except Exception as e:
         return handle_error(f'Error: {str(e)}', 500)
