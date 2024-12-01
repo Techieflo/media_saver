@@ -2,3 +2,5 @@ Flask==2.1.2
 yt-dlp
 gunicorn==20.1.0
 flask-ngrok
+werkzeug==2.0.3
+
