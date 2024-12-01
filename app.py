@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, request
 import instaloader
+import yt_dlp
+import os
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -36,6 +38,23 @@ def get_instagram_reel_url(url, session_id):
     except Exception as e:
         raise RuntimeError(f"Error: {e}")
 
+# Helper function to get video URL from generic platforms (yt-dlp)
+def get_video_url(url):
+    """Fetch the direct video URL using yt-dlp."""
+    ydl_opts = {
+        'format': 'best',  # Choose the best video quality
+        'quiet': True,     # Suppress unnecessary output
+    }
+
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            result = ydl.extract_info(url, download=False)  # Don't download, just extract info
+            if 'entries' in result:
+                return result['entries'][0]['url']  # Return the first video URL
+            return result['url']  # Return the video URL
+    except Exception as e:
+        raise RuntimeError(f"Error fetching video URL: {str(e)}")
+
 # Helper function to handle errors
 def handle_error(message, status_code=400):
     """Return a structured error response."""
@@ -46,10 +65,15 @@ def handle_error(message, status_code=400):
 def instagram_reel_url_api():
     """API endpoint to get the Instagram reel URL."""
     url = request.args.get('url')
-    session_id = request.args.get('session_id')
 
-    if not url or not session_id:
-        return handle_error('URL and session_id parameters are required')
+    if not url:
+        return handle_error('URL parameter is required')
+
+    # Fetch the session ID from environment variables
+    session_id = os.getenv('SESSION_ID')
+
+    if not session_id:
+        return handle_error('Session ID is not set. Please configure the session ID in the environment variables.', 500)
 
     # Validate session ID before proceeding
     if not is_session_valid(session_id):
@@ -58,6 +82,21 @@ def instagram_reel_url_api():
     try:
         reel_url = get_instagram_reel_url(url, session_id)
         return jsonify({'video_url': reel_url})
+    except Exception as e:
+        return handle_error(f'Error: {str(e)}', 500)
+
+# API endpoint to get the generic video URL (from YouTube or other sources)
+@app.route('/get_video_url', methods=['GET'])
+def video_url_api():
+    """API endpoint to get the video URL from the provided URL (YouTube or other platforms)."""
+    url = request.args.get('url')
+
+    if not url:
+        return handle_error('URL parameter is required')
+
+    try:
+        video_url = get_video_url(url)
+        return jsonify({'video_url': video_url})
     except Exception as e:
         return handle_error(f'Error: {str(e)}', 500)
 
