@@ -3,20 +3,29 @@ import instaloader
 import yt_dlp
 import os
 import base64
+import requests
 
 # Initialize Flask app
 app = Flask(__name__)
 
-# Helper function to decode and save cookies
-def decode_and_save_cookies():
-    """Decode Base64 cookies from environment variable and save to a file."""
-    cookies_base64 = os.getenv('COOKIES_BASE64')
+# Helper function to download and save cookies from MediaFire
+def download_and_save_cookies():
+    """Download cookies file from MediaFire using the direct link and save it locally."""
+    download_link = os.getenv('downloadlink')  # Get download link from environment variable
     cookies_path = 'cookies.txt'
 
-    if cookies_base64:
-        with open(cookies_path, 'wb') as f:
-            f.write(base64.b64decode(cookies_base64))
-    return cookies_path
+    if download_link:
+        try:
+            response = requests.get(download_link)
+            response.raise_for_status()  # Ensure we handle any errors in downloading the file
+            
+            with open(cookies_path, 'wb') as f:
+                f.write(response.content)
+            return cookies_path
+        except requests.exceptions.RequestException as e:
+            raise RuntimeError(f"Error downloading cookies file: {e}")
+    else:
+        raise ValueError("No download link found in environment variables.")
 
 # Helper function to fetch Instagram session ID
 def get_instagram_session_id():
@@ -59,7 +68,7 @@ def get_instagram_reel_url(url, session_id):
 def get_youtube_video_url(url):
     """Fetch the direct video URL for YouTube."""
     try:
-        cookies_path = decode_and_save_cookies()  # Decode cookies to a file
+        cookies_path = download_and_save_cookies()  # Download cookies from MediaFire
         ydl_opts = {
             'format': 'best',
             'quiet': True,
