@@ -1,5 +1,14 @@
-ydl_opts = {
-    'format': 'best',
-    'quiet': True,
-    'cookiefile': 'cookies.txt',  # Path to your cookies file
-}
+# Netscape HTTP Cookie File
+# http://curl.haxx.se/rfc/cookie_spec.html
+# This is a generated file!  Do not edit.
+
+.instagram.com	TRUE	/	TRUE	1767519837	datr	XN5KZwO2qgClMXBGbzVXJnob
+.instagram.com	TRUE	/	TRUE	1764495844	ig_did	D29CBEC7-A322-452D-9B71-3B87F0566A7B
+.instagram.com	TRUE	/	TRUE	1733655567	wd	1536x730
+.instagram.com	TRUE	/	TRUE	1733655567	dpr	1.25
+.instagram.com	TRUE	/	TRUE	1767519841	mid	Z0reXQALAAEJF1QiCBoYOZaL6c62
+.instagram.com	TRUE	/	TRUE	1764495841	ig_nrcb	1
+.instagram.com	TRUE	/	TRUE	1764502141	csrftoken	UJXnayxkScajWszaRluwce8GranArIr3
+.instagram.com	TRUE	/	TRUE	1740828541	ds_user_id	30988570359
+.instagram.com	TRUE	/	TRUE	1764586769	sessionid	30988570359%3ABWHQrqJF2S4bnG%3A24%3AAYfS9o-kfBmbtLWvNrvlr7sF9Aaqo_HZu0dpahhY7Q
+.instagram.com	TRUE	/	TRUE	0	rur	"RVA\05430988570359\0541764588542:01f70e9b460e053fc81f88a367dec09932b1e015ad3abec180c0d5749957a542789bb072"
