@@ -1,9 +1,8 @@
-
+import yt_dlp
 from flask import Flask, request, jsonify
 import subprocess
 import json
 import requests
-import re
 from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
@@ -12,10 +11,10 @@ app = Flask(__name__)
 def clean_youtube_url(url):
     # Parse the URL
     parsed_url = urlparse(url)
-
+    
     # Extract the query parameters
     query_params = parse_qs(parsed_url.query)
-
+    
     # Extract video ID from the 'v' parameter and construct the clean URL
     video_id = query_params.get('v', [None])[0]
     if video_id:
@@ -24,9 +23,16 @@ def clean_youtube_url(url):
     else:
         return None
 
+# Function to get video information using yt-dlp (Python wrapper)
+def get_video_info(youtube_url):
+    ydl_opts = {'quiet': True, 'format': 'bestvideo+bestaudio/best'}
+    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        result = ydl.extract_info(youtube_url, download=False)
+        return result
+
 # API endpoint to process the YouTube URL
-@app.route('/get_video', methods=['POST'])
-def get_video():
+@app.route('/get_youtube_info', methods=['POST'])
+def get_youtube_info():
     # Extract URL from the request
     data = request.get_json()
     youtube_url = data.get('url')
@@ -39,17 +45,9 @@ def get_video():
     if not clean_url:
         return jsonify({"error": "Invalid YouTube URL. No video ID found."}), 400
 
-    # Run yt-dlp to fetch available formats in JSON format and list the best quality
     try:
-        result = subprocess.run(
-            ['yt-dlp', '--no-warnings', '-j', clean_url],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-
-        # Parse the JSON output
-        video_info = json.loads(result.stdout)
+        # Get video info using yt-dlp
+        video_info = get_video_info(clean_url)
 
         # Find the best video with both video and audio
         best_video = None
@@ -81,81 +79,10 @@ def get_video():
 
             return jsonify(response_data)
 
-    except subprocess.CalledProcessError as e:
-        return jsonify({
-            "error": f"yt-dlp error: {e.stderr}"
-        }), 500
-    except json.JSONDecodeError as e:
-        return jsonify({
-            "error": f"Error decoding JSON: {e}"
-        }), 500
-    except Exception as e:
-        return jsonify({
-            "error": f"An unexpected error occurred: {e}"
-        }), 500
-        # Function to clean YouTube URL by extracting only the video ID after 'v='
-def clean_youtube_url(url):
-    # Parse the URL
-    parsed_url = urlparse(url)
-    
-    # Extract the query parameters
-    query_params = parse_qs(parsed_url.query)
-    
-    # Extract video ID from the 'v' parameter and construct the clean URL
-    video_id = query_params.get('v', [None])[0]
-    if video_id:
-        clean_url = f"https://www.youtube.com/watch?v={video_id}"
-        return clean_url
-    else:
-        return None
-
-# Define the API endpoint
-@app.route('/get_youtube_info', methods=['POST'])
-def get_youtube_info():
-    data = request.get_json()
-    youtube_url = data.get('url')
-
-    # Clean the URL by removing unnecessary parameters
-    clean_url = clean_youtube_url(youtube_url)
-    if not clean_url:
-        return jsonify({'error': 'Invalid YouTube URL. No video ID found.'}), 400
-
-    try:
-        # Run yt-dlp to fetch available formats in JSON format and list the best quality
-        result = subprocess.run(
-            ['yt-dlp', '--no-warnings', '-j', clean_url],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-
-        # Parse the JSON output
-        video_info = json.loads(result.stdout)
-
-        # Find the best video with both video and audio
-        best_video = None
-        best_audio = None
-
-        for format in video_info['formats']:
-            # Prefer a format with both video and audio
-            if format.get('vcodec') != 'none' and format.get('acodec') != 'none':
-                if best_video is None or format['height'] > best_video['height']:
-                    best_video = format
-                if best_audio is None or format['abr'] > best_audio['abr']:
-                    best_audio = format
-
-        if best_video and best_audio:
-            # Prepare the response with the cleaned URL, best video, and best audio
-            return jsonify({
-                'cleaned_url': clean_url,
-                'best_video_url': best_video['url'],
-                'best_audio_url': best_audio['url']
-            })
-
         else:
             return jsonify({'error': 'Could not find valid video or audio formats.'}), 404
 
-    except subprocess.CalledProcessError as e:
+    except yt_dlp.utils.DownloadError as e:
         return jsonify({'error': f"Error during yt-dlp execution: {e}"}), 500
     except json.JSONDecodeError as e:
         return jsonify({'error': f"Error decoding JSON: {e}"}), 500
