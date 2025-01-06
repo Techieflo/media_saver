@@ -112,7 +112,7 @@ def youtube_video_url_api():
         return handle_error(f'Error: {str(e)}', 500)
 
 # Endpoint for fetching best video and audio from YouTube
-@app.route('/getyoutubevideo', methods=['POST'])
+@app.route('/get_youtube_video', methods=['POST'])
 def getyoutubevideo():
     data = request.get_json()
     youtube_url = data.get('url')
