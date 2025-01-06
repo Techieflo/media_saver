@@ -60,27 +60,16 @@ def get_instagram_reel_url(url, session_id):
     except Exception as e:
         raise RuntimeError(f"Error fetching Instagram reel: {e}")
 
-# Helper function to fetch YouTube video URL
-def get_youtube_video_url(url):
-    try:
-        cookies_path = download_and_save_cookies()
-        ydl_opts = {
-            'format': 'best',
-            'quiet': True,
-            'cookies': cookies_path,
-            'noplaylist': True,
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            result = ydl.extract_info(url, download=False)
-            if 'entries' in result:
-                return result['entries'][0]['url']
-            return result['url']
-    except Exception as e:
-        raise RuntimeError(f"Error fetching YouTube video: {e}")
-
-# Helper function to handle errors
-def handle_error(message, status_code=400):
-    return jsonify({'error': message}), status_code
+# Helper function to clean YouTube URL by extracting only the video ID after 'v='
+def clean_youtube_url(url):
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    video_id = query_params.get('v', [None])[0]
+    if video_id:
+        clean_url = f"https://www.youtube.com/watch?v={video_id}"
+        return clean_url
+    else:
+        return None
 
 # API endpoint for Instagram reel URL
 @app.route('/get_instagram_reel_url', methods=['GET'])
@@ -106,28 +95,24 @@ def youtube_video_url_api():
     if not url:
         return handle_error('URL parameter is required.')
     try:
-        video_url = get_youtube_video_url(url)
-        return jsonify({'video_url': video_url})
-    except Exception as e:
-        return handle_error(f'Error: {str(e)}', 500)
+        clean_url = clean_youtube_url(url)
+        if not clean_url:
+            return handle_error('Invalid YouTube URL. No video ID found.', 400)
 
-# Endpoint for fetching best video and audio from YouTube
-@app.route('/get_youtube_video', methods=['POST'])
-def getyoutubevideo():
-    data = request.get_json()
-    youtube_url = data.get('url')
-    if not youtube_url:
-        return jsonify({"error": "YouTube URL is required"}), 400
-
-    try:
         result = subprocess.run(
-            ['yt-dlp', '--no-warnings', '-j', youtube_url],
-            capture_output=True, text=True, check=True
+            ['yt-dlp', '--no-warnings', '-j', clean_url],
+            capture_output=True,
+            text=True,
+            check=True
         )
+
+        # Parse the JSON output
         video_info = json.loads(result.stdout)
 
+        # Find the best video with both video and audio
         best_video = None
         best_audio = None
+
         for format in video_info['formats']:
             if format.get('vcodec') != 'none' and format.get('acodec') != 'none':
                 if best_video is None or format['height'] > best_video['height']:
@@ -141,22 +126,11 @@ def getyoutubevideo():
                 "best_audio_url": best_audio['url']
             })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return handle_error(f'Error: {str(e)}', 500)
 
-# Endpoint for fetching a simple YouTube video URL
-@app.route('/get_video_url', methods=['GET'])
-def video_url_api():
-    url = request.args.get('url')
-    if not url:
-        return jsonify({'error': 'URL parameter is required'}), 400
-    try:
-        cookies_path = download_and_save_cookies()
-        ydl_opts = {'format': 'best', 'cookies': cookies_path, 'quiet': True}
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
-            return jsonify({'video_url': info['url']})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+# Helper function to handle errors
+def handle_error(message, status_code=400):
+    return jsonify({'error': message}), status_code
 
 # Run the Flask app
 if __name__ == '__main__':
