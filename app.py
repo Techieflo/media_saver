@@ -15,6 +15,7 @@ def get_instagram_session_id():
     session_id = os.getenv('SESSION_ID')
     if not session_id:
         raise ValueError("Instagram session ID is not set in environment variables.")
+    print(f"Session ID: {session_id}")  # Debugging output
     return session_id
 
 # Helper function to check if the Instagram session ID is valid
@@ -25,9 +26,10 @@ def is_instagram_session_valid(session_id):
         loader.context._session.cookies.set('sessionid', session_id)
         # Test with a public profile
         instaloader.Profile.from_username(loader.context, "instagram")
+        print("Session is valid")  # Debugging output
         return True
     except Exception as e:
-        print(f"Instagram session validation error: {e}")
+        print(f"Instagram session validation error: {e}")  # Debugging output
         return False
 
 # Helper function to get Instagram reel URL
@@ -43,6 +45,8 @@ def get_instagram_reel_url(url, session_id):
             raise RuntimeError("The provided URL does not point to a video reel.")
 
         return post.video_url
+    except instaloader.exceptions.InstaloaderException as e:
+        raise RuntimeError(f"Instaloader error: {e}")
     except Exception as e:
         raise RuntimeError(f"Error fetching Instagram reel: {e}")
 
@@ -51,13 +55,10 @@ COOKIES_PATH = "/data/cookies.txt"
 
 # Function to clean YouTube URL by extracting only the video ID after 'v='
 def clean_youtube_url(url):
-    # Parse the URL
+    """Extract video ID from YouTube URL and construct the clean URL."""
     parsed_url = urlparse(url)
-
-    # Extract the query parameters
     query_params = parse_qs(parsed_url.query)
 
-    # Extract video ID from the 'v' parameter and construct the clean URL
     video_id = query_params.get('v', [None])[0]
     if video_id:
         clean_url = f"https://www.youtube.com/watch?v={video_id}"
@@ -66,8 +67,8 @@ def clean_youtube_url(url):
 
 # Function to get the best video and audio URLs
 def get_best_video_and_audio(clean_url, cookies_path):
+    """Fetch the best video and audio streams using yt-dlp."""
     try:
-        # Run yt-dlp to fetch video information in JSON format
         command = [
             "yt-dlp", "--no-warnings", "-j", clean_url,
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", 
@@ -84,10 +85,8 @@ def get_best_video_and_audio(clean_url, cookies_path):
             check=True
         )
 
-        # Parse the JSON output
         video_info = json.loads(result.stdout)
 
-        # Find the best video and audio streams
         best_video = None
         best_audio = None
 
@@ -118,20 +117,21 @@ def instagram_reel_url_api():
     session_id = get_instagram_session_id()  # Fetch session ID from environment
 
     if not url:
-        return handle_error('URL parameter is required.')
+        return jsonify({'error': 'URL parameter is required.'}), 400
 
     if not is_instagram_session_valid(session_id):
-        return handle_error('Invalid or expired Instagram session ID.', 401)
+        return jsonify({'error': 'Invalid or expired Instagram session ID.'}), 401
 
     try:
         reel_url = get_instagram_reel_url(url, session_id)
         return jsonify({'video_url': reel_url})
     except Exception as e:
-        return handle_error(f'Error: {str(e)}', 500)
+        return jsonify({'error': str(e)}), 500
 
 # API endpoint to get the best video and audio URLs
 @app.route('/get_video_audio_urls', methods=['POST'])
 def get_video_audio_urls_endpoint():
+    """API endpoint to get the best video and audio URLs from YouTube."""
     try:
         data = request.json
         youtube_url = data.get('url')
