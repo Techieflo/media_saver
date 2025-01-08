@@ -1,127 +1,97 @@
-from flask import Flask, jsonify, request
-import instaloader
-import yt_dlp
-import os
-import base64
+from flask import Flask, request, jsonify
+import subprocess
+import json
 import requests
+from urllib.parse import urlparse, parse_qs
+import os
 
-# Initialize Flask app
 app = Flask(__name__)
 
-# Helper function to download and save cookies from MediaFire
-def download_and_save_cookies():
-    """Download cookies file from MediaFire using the direct link and save it locally."""
-    download_link = os.getenv('downloadlink')  # Get download link from environment variable
-    cookies_path = 'cookies.txt'
+# Path to cookies.txt file (adjust for Render environment)
+COOKIES_PATH = "/data/cookies.txt"
 
-    if download_link:
-        try:
-            response = requests.get(download_link)
-            response.raise_for_status()  # Ensure we handle any errors in downloading the file
-            
-            with open(cookies_path, 'wb') as f:
-                f.write(response.content)
-            return cookies_path
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"Error downloading cookies file: {e}")
-    else:
-        raise ValueError("No download link found in environment variables.")
+# Function to clean YouTube URL by extracting only the video ID after 'v='
+def clean_youtube_url(url):
+    # Parse the URL
+    parsed_url = urlparse(url)
 
-# Helper function to fetch Instagram session ID
-def get_instagram_session_id():
-    """Fetch Instagram session ID from environment variables."""
-    session_id = os.getenv('SESSION_ID')
-    if not session_id:
-        raise ValueError("Instagram session ID is not set in environment variables.")
-    return session_id
+    # Extract the query parameters
+    query_params = parse_qs(parsed_url.query)
 
-# Helper function to check if the Instagram session ID is valid
-def is_instagram_session_valid(session_id):
-    """Check if the provided session ID is valid for Instagram."""
+    # Extract video ID from the 'v' parameter and construct the clean URL
+    video_id = query_params.get('v', [None])[0]
+    if video_id:
+        clean_url = f"https://www.youtube.com/watch?v={video_id}"
+        return clean_url
+    return None
+
+# Function to get the best video and audio URLs
+def get_best_video_and_audio(clean_url, cookies_path):
     try:
-        loader = instaloader.Instaloader()
-        loader.context._session.cookies.set('sessionid', session_id)
-        # Test with a public profile
-        instaloader.Profile.from_username(loader.context, "instagram")
-        return True
-    except Exception as e:
-        print(f"Instagram session validation error: {e}")
-        return False
+        # Run yt-dlp to fetch video information in JSON format
+        command = ["yt-dlp", "--no-warnings", "-j", clean_url]
+        if cookies_path:
+            command.extend(["--cookies", cookies_path])
 
-# Helper function to get Instagram reel URL
-def get_instagram_reel_url(url, session_id):
-    """Fetch the direct video URL for Instagram Reels."""
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        # Parse the JSON output
+        video_info = json.loads(result.stdout)
+
+        # Find the best video and audio streams
+        best_video = None
+        best_audio = None
+
+        for fmt in video_info["formats"]:
+            if fmt.get("vcodec") != "none" and fmt.get("acodec") != "none":
+                if not best_video or fmt["height"] > best_video["height"]:
+                    best_video = fmt
+            elif fmt.get("acodec") != "none":
+                if not best_audio or fmt.get("abr") > best_audio["abr"]:
+                    best_audio = fmt
+
+        if best_video and best_audio:
+            return {"video_url": best_video["url"], "audio_url": best_audio["url"]}
+        else:
+            return {"error": "No suitable video or audio streams found."}
+    except subprocess.CalledProcessError as e:
+        return {"error": f"yt-dlp error: {e}"}
+    except json.JSONDecodeError as e:
+        return {"error": f"JSON parsing error: {e}"}
+    except Exception as e:
+        return {"error": f"Unexpected error: {e}"}
+
+# API endpoint to get the best video and audio URLs
+@app.route('/get_video_audio_urls', methods=['POST'])
+def get_video_audio_urls_endpoint():
     try:
-        loader = instaloader.Instaloader()
-        loader.context._session.cookies.set('sessionid', session_id)
-        shortcode = url.split('/')[-2]
-        post = instaloader.Post.from_shortcode(loader.context, shortcode)
+        data = request.json
+        youtube_url = data.get('url')
 
-        if not post.is_video:
-            raise RuntimeError("The provided URL does not point to a video reel.")
+        if not youtube_url:
+            return jsonify({"error": "YouTube URL is required"}), 400
 
-        return post.video_url
+        clean_url = clean_youtube_url(youtube_url)
+        if not clean_url:
+            return jsonify({"error": "Invalid YouTube URL"}), 400
+
+        result = get_best_video_and_audio(clean_url, COOKIES_PATH)
+
+        if "error" in result:
+            return jsonify({"error": result["error"]}), 500
+
+        return jsonify({
+            "message": "Successfully retrieved video and audio URLs",
+            "video_url": result["video_url"],
+            "audio_url": result["audio_url"]
+        })
     except Exception as e:
-        raise RuntimeError(f"Error fetching Instagram reel: {e}")
+        return jsonify({"error": str(e)}), 500
 
-# Helper function to get YouTube video URL using yt-dlp
-def get_youtube_video_url(url):
-    """Fetch the direct video URL for YouTube."""
-    try:
-        cookies_path = download_and_save_cookies()  # Use the downloaded cookie path
-        ydl_opts = {
-            'format': 'best',
-            'quiet': True,
-            'cookies': cookies_path,  # Pass the cookies file to yt-dlp
-            'noplaylist': True,  # Disable playlist extraction (if not needed)
-        }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            result = ydl.extract_info(url, download=False)
-            if 'entries' in result:
-                return result['entries'][0]['url']
-            return result['url']
-    except Exception as e:
-        raise RuntimeError(f"Error fetching YouTube video: {e}")
-
-# Helper function to handle errors
-def handle_error(message, status_code=400):
-    """Return a structured error response."""
-    return jsonify({'error': message}), status_code
-
-# API endpoint to get Instagram reel URL
-@app.route('/get_instagram_reel_url', methods=['GET'])
-def instagram_reel_url_api():
-    """API endpoint to get the Instagram reel URL."""
-    url = request.args.get('url')
-    session_id = get_instagram_session_id()  # Fetch session ID from environment
-
-    if not url:
-        return handle_error('URL parameter is required.')
-
-    if not is_instagram_session_valid(session_id):
-        return handle_error('Invalid or expired Instagram session ID.', 401)
-
-    try:
-        reel_url = get_instagram_reel_url(url, session_id)
-        return jsonify({'video_url': reel_url})
-    except Exception as e:
-        return handle_error(f'Error: {str(e)}', 500)
-
-# API endpoint to get YouTube video URL
-@app.route('/get_youtube_video_url', methods=['GET'])
-def youtube_video_url_api():
-    """API endpoint to get the YouTube video URL."""
-    url = request.args.get('url')
-
-    if not url:
-        return handle_error('URL parameter is required.')
-
-    try:
-        video_url = get_youtube_video_url(url)
-        return jsonify({'video_url': video_url})
-    except Exception as e:
-        return handle_error(f'Error: {str(e)}', 500)
-
-# Run the Flask app
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)  # Render needs to listen on 0.0.0.0 for IP binding
+    app.run(host='0.0.0.0', port=8080)
