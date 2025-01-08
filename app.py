@@ -8,6 +8,7 @@ from urllib.parse import urlparse, parse_qs
 import os
 
 app = Flask(__name__)
+
 # Helper function to fetch Instagram session ID
 def get_instagram_session_id():
     """Fetch Instagram session ID from environment variables."""
@@ -45,7 +46,6 @@ def get_instagram_reel_url(url, session_id):
     except Exception as e:
         raise RuntimeError(f"Error fetching Instagram reel: {e}")
 
-
 # Path to cookies.txt file (adjust for Render environment)
 COOKIES_PATH = "/data/cookies.txt"
 
@@ -68,11 +68,11 @@ def clean_youtube_url(url):
 def get_best_video_and_audio(clean_url, cookies_path):
     try:
         # Run yt-dlp to fetch video information in JSON format
-      command = [
-    "yt-dlp", "--no-warnings", "-j", clean_url,
-    "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", 
-    "--no-check-certificate"
-]
+        command = [
+            "yt-dlp", "--no-warnings", "-j", clean_url,
+            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", 
+            "--no-check-certificate"
+        ]
 
         if cookies_path:
             command.extend(["--cookies", cookies_path])
@@ -109,6 +109,7 @@ def get_best_video_and_audio(clean_url, cookies_path):
         return {"error": f"JSON parsing error: {e}"}
     except Exception as e:
         return {"error": f"Unexpected error: {e}"}
+
 # API endpoint to get Instagram reel URL
 @app.route('/get_instagram_reel_url', methods=['GET'])
 def instagram_reel_url_api():
@@ -154,7 +155,6 @@ def get_video_audio_urls_endpoint():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-        
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
