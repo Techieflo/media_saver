@@ -63,6 +63,10 @@ def clean_youtube_url(url):
         query_params = parse_qs(parsed_url.query)
         video_id = query_params.get('v', [None])[0]
 
+        # Handle shorts URLs
+        if not video_id and 'shorts' in parsed_url.path:
+            video_id = parsed_url.path.split('/')[-1]
+
     # Handle shortened youtu.be URLs
     elif 'youtu.be' in parsed_url.netloc:
         video_id = parsed_url.path.lstrip('/')
