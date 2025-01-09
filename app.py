@@ -57,12 +57,24 @@ COOKIES_PATH = "/data/cookies.txt"
 def clean_youtube_url(url):
     """Extract video ID from YouTube URL and construct the clean URL."""
     parsed_url = urlparse(url)
-    query_params = parse_qs(parsed_url.query)
 
-    video_id = query_params.get('v', [None])[0]
+    # Handle standard YouTube URLs
+    if 'youtube.com' in parsed_url.netloc:
+        query_params = parse_qs(parsed_url.query)
+        video_id = query_params.get('v', [None])[0]
+
+    # Handle shortened youtu.be URLs
+    elif 'youtu.be' in parsed_url.netloc:
+        video_id = parsed_url.path.lstrip('/')
+
+    else:
+        return None  # Return None if the URL is not a recognized YouTube URL
+
+    # Construct the clean YouTube URL if a video ID was found
     if video_id:
         clean_url = f"https://www.youtube.com/watch?v={video_id}"
         return clean_url
+
     return None
 
 # Function to get the best video and audio URLs
@@ -95,7 +107,7 @@ def get_best_video_and_audio(clean_url, cookies_path):
                 if not best_video or fmt["height"] > best_video["height"]:
                     best_video = fmt
             elif fmt.get("acodec") != "none":
-                if not best_audio or fmt.get("abr") > best_audio["abr"]:
+                if not best_audio or fmt["abr"] > best_audio["abr"]:
                     best_audio = fmt
 
         if best_video and best_audio:
