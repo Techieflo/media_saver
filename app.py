@@ -1,27 +1,20 @@
 from flask import Flask, request, jsonify
 import subprocess
 import json
+import requests
+import instaloader
 import os
 from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
-# Path to the Render secret file
-COOKIES_PATH = "/etc/secrets/cookies.txt"
+# Path to cookies.txt file in Render Secrets
+COOKIES_PATH = "/secrets/cookies.txt"
 
-# Function to read cookies from the secret file
-def read_cookies():
-    """Read cookies.txt content from the secret file."""
-    try:
-        with open(COOKIES_PATH, "r") as file:
-            return file.read()
-    except FileNotFoundError:
-        print("Error: Cookies file not found.")
-        return None
+# Function to clean YouTube URL by extracting only the video ID
 
-# Function to clean YouTube URL by extracting the video ID
 def clean_youtube_url(url):
-    """Extract video ID from YouTube URL and construct a clean URL."""
+    """Extract video ID from YouTube URL and construct the clean URL."""
     parsed_url = urlparse(url)
 
     if 'youtube.com' in parsed_url.netloc:
@@ -35,33 +28,34 @@ def clean_youtube_url(url):
         video_id = parsed_url.path.lstrip('/')
 
     else:
-        return None  # Not a recognized YouTube URL
+        return None
 
     return f"https://www.youtube.com/watch?v={video_id}" if video_id else None
 
 # Function to get the best video and audio URLs
-def get_best_video_and_audio(clean_url, cookies_content):
-    """Fetch best video and audio streams using yt-dlp."""
+def get_best_video_and_audio(clean_url, cookies_path):
+    """Fetch the best video and audio streams using yt-dlp."""
     try:
         command = [
             "yt-dlp", "--no-warnings", "-j", clean_url,
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", 
-            "--no-check-certificate",
-            "--cookies-from-file", "-"  # Read cookies from stdin
+            "--no-check-certificate"
         ]
+
+        if os.path.exists(cookies_path):
+            command.extend(["--cookies", cookies_path])
+        else:
+            return {"error": "Cookies file not found in Render Secrets."}
 
         result = subprocess.run(
             command,
-            input=cookies_content,
             capture_output=True,
             text=True,
             check=True
         )
 
         video_info = json.loads(result.stdout)
-
-        best_video = None
-        best_audio = None
+        best_video, best_audio = None, None
 
         for fmt in video_info["formats"]:
             if fmt.get("vcodec") != "none" and fmt.get("acodec") != "none":
@@ -85,7 +79,7 @@ def get_best_video_and_audio(clean_url, cookies_content):
 # API endpoint to get YouTube video and audio URLs
 @app.route('/get_video_audio_urls', methods=['POST'])
 def get_video_audio_urls_endpoint():
-    """API endpoint to get best video and audio URLs from YouTube."""
+    """API endpoint to get the best video and audio URLs from YouTube."""
     try:
         data = request.json
         youtube_url = data.get('url')
@@ -97,12 +91,7 @@ def get_video_audio_urls_endpoint():
         if not clean_url:
             return jsonify({"error": "Invalid YouTube URL"}), 400
 
-        # Read cookies from the secret file
-        cookies_content = read_cookies()
-        if not cookies_content:
-            return jsonify({"error": "Failed to load cookies from Render Secret File"}), 500
-
-        result = get_best_video_and_audio(clean_url, cookies_content)
+        result = get_best_video_and_audio(clean_url, COOKIES_PATH)
 
         if "error" in result:
             return jsonify({"error": result["error"]}), 500
