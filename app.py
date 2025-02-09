@@ -1,26 +1,22 @@
 from flask import Flask, request, jsonify
 import subprocess
 import json
-import requests
-import instaloader
 import os
 from urllib.parse import urlparse, parse_qs
 
 app = Flask(__name__)
 
-# GitHub raw URL of the cookies.txt file
-GITHUB_COOKIES_URL = "https://raw.githubusercontent.com/Techieflo/media_saver/main/cookies.txt"
+# Path to the Render secret file
+COOKIES_PATH = "/etc/secrets/cookies.txt"
 
-
-# Function to fetch the cookies.txt file from GitHub
-def fetch_cookies_from_github():
-    """Fetch cookies.txt content from GitHub and return it as a string."""
+# Function to read cookies from the secret file
+def read_cookies():
+    """Read cookies.txt content from the secret file."""
     try:
-        response = requests.get(GITHUB_COOKIES_URL)
-        response.raise_for_status()  # Raise an error for failed requests
-        return response.text
-    except requests.RequestException as e:
-        print(f"Error fetching cookies from GitHub: {e}")
+        with open(COOKIES_PATH, "r") as file:
+            return file.read()
+    except FileNotFoundError:
+        print("Error: Cookies file not found.")
         return None
 
 # Function to clean YouTube URL by extracting the video ID
@@ -101,10 +97,10 @@ def get_video_audio_urls_endpoint():
         if not clean_url:
             return jsonify({"error": "Invalid YouTube URL"}), 400
 
-        # Fetch cookies from GitHub
-        cookies_content = fetch_cookies_from_github()
+        # Read cookies from the secret file
+        cookies_content = read_cookies()
         if not cookies_content:
-            return jsonify({"error": "Failed to load cookies from GitHub"}), 500
+            return jsonify({"error": "Failed to load cookies from Render Secret File"}), 500
 
         result = get_best_video_and_audio(clean_url, cookies_content)
 
