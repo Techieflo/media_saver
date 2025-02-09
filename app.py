@@ -9,7 +9,7 @@ from urllib.parse import urlparse, parse_qs
 app = Flask(__name__)
 
 # Path to cookies.txt file in Render Secrets
-COOKIES_PATH = "etc/secrets/cookies.txt"
+COOKIES_PATH = "etc/secrets/cookies"
 
 # Function to clean YouTube URL by extracting only the video ID
 
