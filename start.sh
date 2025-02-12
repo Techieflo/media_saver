@@ -5,3 +5,5 @@ mkdir -p /data
 
 # Copy cookies.txt to /data
 cp ./cookies.txt /data/cookies.txt
+# Start the Gunicorn server
+gunicorn --bind 0.0.0.0:8080 --workers 4 --threads 2 --timeout 120 app:app
