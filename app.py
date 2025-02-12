@@ -87,7 +87,7 @@ def get_best_video_and_audio(clean_url, cookies_path):
     try:
         command = [
             "yt-dlp", "--no-warnings", "-j", clean_url,
-            # "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36", 
+            # "--user-agent", "Mozilla/5.0 (Linux; Android 11; Pixel 4 XL) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.104 Mobile Safari/537.36", 
             # "--no-check-certificate"
         ]
 
