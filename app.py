@@ -4,8 +4,13 @@ import json
 import os
 import instaloader
 from urllib.parse import urlparse, parse_qs
+from threading import Semaphore
 
 app = Flask(__name__)
+
+# Set a limit on the number of concurrent requests
+MAX_CONCURRENT_REQUESTS = 5
+semaphore = Semaphore(MAX_CONCURRENT_REQUESTS)
 
 # Helper function to fetch Instagram session ID
 def get_instagram_session_id():
@@ -112,6 +117,8 @@ def instagram_reel_url_api():
 @app.route('/get_video_audio_urls', methods=['POST'])
 def get_video_audio_urls_endpoint():
     """API endpoint to get video and audio URLs using cookies."""
+    if not semaphore.acquire(blocking=False):
+        return jsonify({"error": "Server overload; you are on a queue. Please wait."}), 503
     try:
         data = request.json
         youtube_url = data.get('url')
@@ -130,6 +137,8 @@ def get_video_audio_urls_endpoint():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    finally:
+        semaphore.release()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
