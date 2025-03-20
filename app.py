@@ -61,7 +61,7 @@ def get_best_video_and_audio(clean_url):
         
         command = [
             "yt-dlp", "--no-warnings", "-j", clean_url,
-           "--cookies-from-file", cookies_path
+            "--cookies", cookies_path
         ]
         
         result = subprocess.run(
