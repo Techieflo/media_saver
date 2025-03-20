@@ -62,7 +62,18 @@ def get_best_video_and_audio(clean_url):
         result = subprocess.run(
             command, capture_output=True, text=True, check=True
         )
-        video_info = json.loads(result.stdout)
+        
+        if not result.stdout:
+            return {"error": "yt-dlp did not return any output."}
+        
+        try:
+            video_info = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return {"error": "Failed to parse yt-dlp response."}
+        
+        if not isinstance(video_info, dict) or "formats" not in video_info:
+            return {"error": "Unexpected yt-dlp response format."}
+        
         best_video, best_audio = None, None
         for fmt in video_info.get("formats", []):
             if fmt.get("vcodec") != "none" and fmt.get("acodec") != "none":
@@ -71,6 +82,7 @@ def get_best_video_and_audio(clean_url):
             elif fmt.get("acodec") != "none":
                 if not best_audio or fmt["abr"] > best_audio["abr"]:
                     best_audio = fmt
+        
         if best_video and best_audio:
             return {"video_url": best_video["url"], "audio_url": best_audio["url"]}
         return {"error": "No suitable video or audio streams found."}
