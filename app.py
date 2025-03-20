@@ -54,9 +54,14 @@ def get_best_video_and_audio(clean_url):
         if not cookies:
             raise ValueError("YouTube cookies are missing from environment variables.")
         
+        # Write cookies to a temporary file
+        cookies_path = "/tmp/cookies.txt"
+        with open(cookies_path, "w") as cookie_file:
+            cookie_file.write(cookies)
+        
         command = [
             "yt-dlp", "--no-warnings", "-j", clean_url,
-            "--cookies-from-browser", "chrome"
+            "--cookies", cookies_path
         ]
         
         result = subprocess.run(
