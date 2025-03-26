@@ -62,17 +62,24 @@ def get_best_video_and_audio(clean_url):
         command = ["yt-dlp", "--no-warnings", "-j", clean_url]
 
         # Only add cookies if they exist
+        cookies_file = None
         if has_cookies:
-            command.extend(["--cookies", "-"])
+            cookies_file = "/tmp/yt_cookies.txt"
+            with open(cookies_file, "w") as f:
+                f.write(cookies)
+            command.extend(["--cookies", cookies_file])
         
-        # Run yt-dlp and pass cookies via stdin if available
+        # Run yt-dlp
         result = subprocess.run(
             command,
-            input=cookies if has_cookies else "",  # Pass cookies directly
             capture_output=True,
             text=True,
             check=True
         )
+
+        # Clean up the cookies file if used
+        if cookies_file:
+            os.remove(cookies_file)
 
         if not result.stdout:
             return {"error": "yt-dlp did not return any output.", "cookies_used": has_cookies}
