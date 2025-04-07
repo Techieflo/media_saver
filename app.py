@@ -81,16 +81,22 @@ def get_best_video_and_audio(clean_url):
         if cookies_file:
             os.remove(cookies_file)
 
+        # Log raw yt-dlp output to a file for debugging
+        log_file = "/tmp/yt-dlp-output.log"
+        with open(log_file, "w") as log:
+            log.write("Raw yt-dlp output:\n")
+            log.write(result.stdout)
+
         if not result.stdout:
             return {"error": "yt-dlp did not return any output.", "cookies_used": has_cookies}
 
         try:
             video_info = json.loads(result.stdout)
         except json.JSONDecodeError:
-            return {"error": "Failed to parse yt-dlp response.", "cookies_used": has_cookies}
+            return {"error": f"Failed to parse yt-dlp response. Raw output logged in {log_file}", "cookies_used": has_cookies}
 
         if not isinstance(video_info, dict) or "formats" not in video_info:
-            return {"error": "Unexpected yt-dlp response format.", "cookies_used": has_cookies}
+            return {"error": f"Unexpected yt-dlp response format. Raw output logged in {log_file}", "cookies_used": has_cookies}
 
         available_formats = video_info.get("formats", [])
         best_video, best_audio = None, None
