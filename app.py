@@ -92,8 +92,10 @@ def get_best_video_and_audio(clean_url):
         if not isinstance(video_info, dict) or "formats" not in video_info:
             return {"error": "Unexpected yt-dlp response format.", "cookies_used": has_cookies}
 
+        available_formats = video_info.get("formats", [])
         best_video, best_audio = None, None
-        for fmt in video_info.get("formats", []):
+
+        for fmt in available_formats:
             if fmt.get("vcodec") != "none" and fmt.get("acodec") != "none":
                 if not best_video or fmt["height"] > best_video["height"]:
                     best_video = fmt
@@ -101,15 +103,20 @@ def get_best_video_and_audio(clean_url):
                 if not best_audio or fmt["abr"] > best_audio["abr"]:
                     best_audio = fmt
 
-        if best_video and best_audio:
-            return {
-                "message": "Successfully retrieved video and audio URLs",
-                "video_url": best_video["url"],
-                "audio_url": best_audio["url"],
-                "cookies_used": has_cookies
-            }
+        response = {
+            "message": "Successfully retrieved video and audio URLs",
+            "available_formats": available_formats,
+            "cookies_used": has_cookies
+        }
 
-        return {"error": "No suitable video or audio streams found.", "cookies_used": has_cookies}
+        if best_video and best_audio:
+            response["best_video_url"] = best_video["url"]
+            response["best_audio_url"] = best_audio["url"]
+
+        if not best_video or not best_audio:
+            response["error"] = "No suitable video or audio streams found."
+
+        return response
 
     except subprocess.CalledProcessError as e:
         # Enhanced error handling for yt-dlp failure
