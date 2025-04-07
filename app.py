@@ -54,7 +54,7 @@ def get_download_link(video_url):
     try:
         cookies = os.getenv("YT_COOKIES")
         ydl_opts = {
-            'format': 'best',
+            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'quiet': True,
             'noplaylist': True,
         }
