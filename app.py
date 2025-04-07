@@ -112,6 +112,9 @@ def get_best_video_and_audio(clean_url):
         return {"error": "No suitable video or audio streams found.", "cookies_used": has_cookies}
 
     except subprocess.CalledProcessError as e:
+        # Enhanced error handling for yt-dlp failure
+        if "Requested format is not available" in e.stderr:
+            return {"error": "Requested format is not available. Please check the available formats.", "cookies_used": has_cookies}
         return {"error": f"yt-dlp failed: {e.stderr}", "cookies_used": has_cookies}
     except Exception as e:
         return {"error": f"Unexpected error: {e}", "cookies_used": has_cookies}
