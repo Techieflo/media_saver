@@ -121,10 +121,15 @@ def get_best_video_and_audio(clean_url):
     except subprocess.CalledProcessError as e:
         # Enhanced error handling for yt-dlp failure
         if "Requested format is not available" in e.stderr:
-            return {"error": "Requested format is not available. Please check the available formats.", "cookies_used": has_cookies}
-        return {"error": f"yt-dlp failed: {e.stderr}", "cookies_used": has_cookies}
+            # Log available formats when the requested format is not available
+            return {
+                "error": "Requested format is not available. Please check the available formats.",
+                "available_formats": json.loads(e.stderr).get("formats", []),
+                "cookies_used": bool(os.getenv("YT_COOKIES"))
+            }
+        return {"error": f"yt-dlp failed: {e.stderr}", "cookies_used": bool(os.getenv("YT_COOKIES"))}
     except Exception as e:
-        return {"error": f"Unexpected error: {e}", "cookies_used": has_cookies}
+        return {"error": f"Unexpected error: {e}", "cookies_used": bool(os.getenv("YT_COOKIES"))}
 
 # API endpoint to get Instagram reel URL
 @app.route('/get_instagram_reel_url', methods=['GET'])
